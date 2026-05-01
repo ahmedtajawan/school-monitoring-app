@@ -1,34 +1,39 @@
 import streamlit as st
 import pandas as pd
 
-st.set_page_config(page_title="School Monitoring Dashboard", layout="wide")
+st.title("📊 Monthly School Assignment Analysis")
 
-st.title("📊 School Monitoring Dashboard")
+# ---- LOAD DATA ----
+url = "https://raw.githubusercontent.com/YOUR_USERNAME/YOUR_REPO/main/roaster_assignment.csv"
 
-st.write("Upload your monthly Excel file")
+@st.cache_data
+def load_data(url):
+    return pd.read_csv(url)
 
-file = st.file_uploader("Upload Excel", type=["xlsx"])
+df = load_data(url)
 
-if file:
-    df = pd.read_excel(file)
+# Clean columns
+df.columns = df.columns.str.strip()
 
-    df.columns = df.columns.str.strip()
+# ---- FILTER: MALE ASSIGNMENTS ----
+male_df = df[df['Gender'] == 'Boys']
 
-    st.write("Columns detected:", df.columns.tolist())
+# ---- PIVOT TABLE ----
+st.subheader("👨 Male Monitor Assignments (Boys Schools)")
 
-    # Sidebar
-    st.sidebar.header("Filters")
-    monitor = st.sidebar.selectbox("Select Monitor", df['Monitor Name'].unique())
+pivot = (
+    male_df.groupby('Monitor Name')['EMIS Code']
+    .nunique()
+    .reset_index()
+    .rename(columns={'EMIS Code': 'Total Schools'})
+    .sort_values(by='Total Schools', ascending=False)
+)
 
-    my_data = df[df['Monitor Name'] == monitor]
+# Add ranking
+pivot['Rank'] = pivot['Total Schools'].rank(ascending=False, method='dense')
 
-    col1, col2 = st.columns(2)
-    col1.metric("Total Assignments", len(my_data))
-    col2.metric("Unique Schools", my_data['EMIS Code'].nunique())
+st.dataframe(pivot)
 
-    st.subheader("Workload Comparison")
-    workload = df.groupby('Monitor Name')['EMIS Code'].count()
-    st.bar_chart(workload)
-
-    st.subheader("Your Data")
-    st.dataframe(my_data)
+# ---- BAR CHART ----
+st.subheader("📊 Workload Distribution (Male Monitors)")
+st.bar_chart(pivot.set_index('Monitor Name'))
